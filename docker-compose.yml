@@ -1,0 +1,12 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: luma, POSTGRES_PASSWORD: luma, POSTGRES_DB: lumalife }
+    ports: ["5432:5432"]
+    volumes: ["luma-db:/var/lib/postgresql/data"]
+  app:
+    build: .
+    ports: ["3000:3000"]
+    env_file: .env
+    depends_on: [db]
+volumes: { luma-db: {} }
