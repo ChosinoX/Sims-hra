@@ -1,0 +1,228 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PLAYER
+  ADMIN
+}
+
+model User {
+  id            String            @id @default(cuid())
+  email         String            @unique
+  passwordHash  String
+  role          Role              @default(PLAYER)
+  blocked       Boolean           @default(false)
+  premiumUntil  DateTime?
+  coins         Int               @default(1600)
+  xp            Int               @default(0)
+  level         Int               @default(1)
+  locale        String            @default("cs")
+  lastSeen      DateTime          @default(now())
+  dailyClaim    DateTime?
+  createdAt     DateTime          @default(now())
+  character     Character?
+  inventory     InventoryItem[]
+  purchases     Purchase[]
+  payments      Payment[]
+  quests        UserQuest[]
+  achievements  UserAchievement[]
+  notifications Notification[]
+  friendFrom    Friendship[]      @relation("from")
+  friendTo      Friendship[]      @relation("to")
+}
+
+model Character {
+  id            String          @id @default(cuid())
+  userId        String          @unique
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  appearance    Json
+  needs         Json            @default("{\"hunger\":80,\"thirst\":80,\"energy\":80,\"hygiene\":80,\"fun\":80,\"social\":80,\"comfort\":80}")
+  skills        Json            @default("{}")
+  x             Float           @default(42)
+  y             Float           @default(60)
+  home          Home?
+  career        CareerProgress?
+  relationships Relationship[]
+}
+
+model Home {
+  id          String            @id @default(cuid())
+  characterId String            @unique
+  character   Character         @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  name        String            @default("Sluneční studio")
+  floor       String            @default("oak")
+  wall        String            @default("mint")
+  value       Int               @default(1200)
+  furniture   PlacedFurniture[]
+}
+
+model Item {
+  id            String            @id @default(cuid())
+  code          String            @unique
+  nameCs        String
+  nameEn        String
+  descriptionCs String
+  descriptionEn String
+  category      String
+  rarity        String            @default("common")
+  price         Int
+  premium       Boolean           @default(false)
+  stats         Json              @default("{}")
+  inventory     InventoryItem[]
+  placed        PlacedFurniture[]
+}
+
+model InventoryItem {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId   String
+  item     Item   @relation(fields: [itemId], references: [id])
+  quantity Int    @default(1)
+
+  @@unique([userId, itemId])
+}
+
+model PlacedFurniture {
+  id       String @id @default(cuid())
+  homeId   String
+  home     Home   @relation(fields: [homeId], references: [id], onDelete: Cascade)
+  itemId   String
+  item     Item   @relation(fields: [itemId], references: [id])
+  x        Int
+  y        Int
+  rotation Int    @default(0)
+}
+
+model Career {
+  id          String           @id @default(cuid())
+  code        String           @unique
+  nameCs      String
+  nameEn      String
+  basePay     Int
+  requirement Json             @default("{}")
+  progress    CareerProgress[]
+}
+
+model CareerProgress {
+  id          String    @id @default(cuid())
+  characterId String    @unique
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  careerId    String
+  career      Career    @relation(fields: [careerId], references: [id])
+  rank        Int       @default(1)
+  xp          Int       @default(0)
+  shiftEnds   DateTime?
+}
+
+model Quest {
+  id          String      @id @default(cuid())
+  code        String      @unique
+  titleCs     String
+  titleEn     String
+  target      Int         @default(1)
+  rewardCoins Int
+  rewardXp    Int
+  users       UserQuest[]
+}
+
+model UserQuest {
+  id       String  @id @default(cuid())
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questId  String
+  quest    Quest   @relation(fields: [questId], references: [id])
+  progress Int     @default(0)
+  claimed  Boolean @default(false)
+
+  @@unique([userId, questId])
+}
+
+model Achievement {
+  id     String            @id @default(cuid())
+  code   String            @unique
+  nameCs String
+  nameEn String
+  reward Int               @default(50)
+  users  UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id])
+  unlockedAt    DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+}
+
+model Friendship {
+  id        String   @id @default(cuid())
+  fromId    String
+  from      User     @relation("from", fields: [fromId], references: [id], onDelete: Cascade)
+  toId      String
+  to        User     @relation("to", fields: [toId], references: [id], onDelete: Cascade)
+  status    String   @default("PENDING")
+  createdAt DateTime @default(now())
+
+  @@unique([fromId, toId])
+}
+
+model Relationship {
+  id          String    @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  npcCode     String
+  friendship  Int       @default(0)
+  romance     Int       @default(0)
+
+  @@unique([characterId, npcCode])
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  stripeEventId   String   @unique
+  stripeSessionId String?
+  amount          Int
+  currency        String
+  status          String
+  createdAt       DateTime @default(now())
+}
+
+model Purchase {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  sku             String
+  stripeSessionId String?
+  createdAt       DateTime @default(now())
+}
+
+model Notification {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type       String
+  messageKey String
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+}
